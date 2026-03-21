@@ -70,24 +70,8 @@ git --version
 
 ## 4. Структура проекта
 
-dokkee-backend/
-├── cmd/
-│   └── main.go
-├── configs/
-│   └── config.yml
-├── internal/
-│   ├── handler/
-│   ├── repository/
-│   └── service/
-├── migrations/
-│   ├── 000001_init.up.sql
-│   └── 000001_init.down.sql
-├── docker-compose.yaml
-├── go.mod
-├── Makefile
-├── README.md
-├── server.go
-└── user.go
+<img width="235" height="343" alt="image" src="https://github.com/user-attachments/assets/31d206f4-1093-49fd-96d2-106bbcdaa7d5" />
+
 
 ## 5. Процесс сборки приложения
 
