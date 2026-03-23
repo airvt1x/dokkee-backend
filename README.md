@@ -45,9 +45,37 @@ make migrate-up
 make env-port-forward
 go run cmd/main.go
 
-Фронтенд должен обращаться на localhost:порт из config.yml (пока фронт и бэк не закинуты в докеры).
+Фронтенд должен обращаться на localhost:порт из config.yml (если бэк не в контейнере и проброшен порт postgres через make env-port-forward).
 
-## 3. Требования для деплоя
+### 2.2 Docker-окружение
+
+Бэкенд теперь может запускаться в Docker-контейнере в одной сети с PostgreSQL.
+
+Команды запуска:
+
+make env-up
+make migrate-up
+make backend-build
+make backend-up
+
+Бэкенд будет доступен на порту из переменной PORT (по умолчанию 8000).
+
+## 3. Тестирование
+
+Проект включает unit-тесты для основных компонентов.
+
+### Запуск тестов
+
+go test ./...
+
+Тесты покрывают:
+- Сервис авторизации (создание пользователя, генерация/парсинг токенов)
+- Репозиторий (работа с БД через mocks)
+- HTTP-хендлеры (sign-up, sign-in)
+
+Тесты используют testify для mocks и sqlmock для БД.
+
+## 4. Требования для деплоя
 
 Перед началом деплоя необходимо убедиться, что на сервере установлены:
 
@@ -68,35 +96,79 @@ docker compose version
 psql --version (или docker exec)
 git --version
 
-## 4. Структура проекта
+## 5. Структура проекта
 
 <img width="235" height="343" alt="image" src="https://github.com/user-attachments/assets/31d206f4-1093-49fd-96d2-106bbcdaa7d5" />
 
 
-## 5. Процесс сборки приложения
+## 6. Docker-конфигурация
 
-### 5.1 Установка зависимостей
+Проект включает Dockerfile для бэкенда и docker-compose.yaml для управления сервисами.
+
+### Dockerfile
+
+Multistage-сборка на основе golang:1.25-alpine и alpine:latest.
+
+Аргументы:
+- PORT: порт для EXPOSE (по умолчанию 8000)
+
+### docker-compose.yaml
+
+Сервисы:
+- dokkee-postgres: PostgreSQL
+- dokkee-backend: бэкенд-приложение
+- dokkee-postgres-migrate: для миграций
+- port-forwarder: для локального доступа к БД
+
+Переменные окружения:
+- PORT: порт бэкенда (дефолт 8000)
+- POSTGRES_*: для подключения к БД
+- salt, sign_key: для JWT
+
+### Команды Makefile для Docker
+
+- make backend-build: пересобрать образ бэкенда
+- make backend-up: запустить бэкенд
+- make backend-down: остановить бэкенд
+- make backend-logs: посмотреть логи
+
+## 7. Процесс сборки приложения
+
+### 7.1 Установка зависимостей
 
 go mod download
 
-### 5.2 Сборка проекта
+### 7.2 Сборка проекта
 
 go build -o bin/server cmd/main.go
 
-## 6. Конфигурация
+## 8. Конфигурация
 
 Пример config.yml:
 
 port: "8000"
 
-Обязательно создать .env файл по примеру .env.example с необходимыми переменными окружения (например, для подключения к БД, API ключами и т.д.).
+Обязательно создать .env файл по примеру .env.example с необходимыми переменными окружения:
+- POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB: для подключения к БД
+- salt, sign_key: для генерации паролей и токенов
 
 
-## 7. Возможные проблемы
+Для Docker: POSTGRES_HOST=dokkee-postgres (внутри сети).
+
+
+## 9. Возможные проблемы
 
 Проблема: БД не подключается
 
 Причина: неверный config.yml или порт не открыт.
+
+Проблема: Тесты не проходят
+
+Причина: отсутствуют зависимости (go mod tidy), или mocks не настроены.
+
+Проблема: Docker-контейнер не стартует
+
+Причина: переменные окружения не заданы в .env, или порт занят.
 
 Решение: проверить config.yml, make env-port-forward.
 
@@ -106,7 +178,7 @@ port: "8000"
 
 Решение: docker logs dokkee-backend
 
-## 8. Ответственные
+## 10. Ответственные
 
 Разработчик бэкенда: Айрат
 

@@ -10,6 +10,26 @@ services:
       - ${PROJECT_ROOT}/out/pgdata:/var/lib/postgresql
     restart: always
 
+  dokkee-backend:
+    build:
+      context: .
+      args:
+        - PORT=${PORT:-8000}
+    container_name: dokkee-env-backend
+    environment:
+      - POSTGRES_HOST=dokkee-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - salt=${salt}
+      - sign_key=${sign_key}
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    depends_on:
+      - dokkee-postgres
+    restart: always
+
   dokkee-postgres-migrate:
     image: migrate/migrate:v4.19.1
     volumes:
