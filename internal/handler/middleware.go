@@ -12,6 +12,7 @@ const (
 	userCtx             = "userId"
 )
 
+// на эту ошибку не обращать внимания, код написал для мидлвейра
 func (h *Handler) userIdentity(c *gin.Context) {
 	header := c.GetHeader(authorizationHeader)
 	if header == "" {
