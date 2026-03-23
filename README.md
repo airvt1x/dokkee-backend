@@ -22,7 +22,7 @@ Docker Compose
 
 migrate (для миграций)
 
-Linux Ubuntu 22.04 (для серверов) (под него будет дописано позже)
+Linux Ubuntu 22.04 (для серверов) 
 
 ## 2. Описание окружения
 
@@ -42,10 +42,10 @@ PostgreSQL: через Docker
 
 make env-up
 make migrate-up
-make env-port-forward
-go run cmd/main.go
+make backend-build
+make backend-up
 
-Фронтенд должен обращаться на localhost:порт из config.yml (если бэк не в контейнере и проброшен порт postgres через make env-port-forward).
+Фронтенд должен обращаться на localhost:8000(либо можно сменить в докеркомпозе).
 
 ### 2.2 Docker-окружение
 
