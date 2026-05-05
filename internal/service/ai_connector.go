@@ -11,28 +11,38 @@ import (
 )
 
 type AIAnalysisResult struct {
-	Risks          []string `json:"risks"`
+	Risks           []string `json:"risks"`
 	FraudIndicators []string `json:"fraud_indicators"`
 	Recommendations []string `json:"recommendations"`
-	Summary        string   `json:"summary"`
+	Summary         string   `json:"summary"`
 }
 
 type AIConnector struct {
 	apiURL string
 	apiKey string
+	model  string
 	client *http.Client
 }
 
 func NewAIConnector() *AIConnector {
+	model := os.Getenv("AI_MODEL")
+	if model == "" {
+		model = "deepseek-chat"
+	}
 	return &AIConnector{
 		apiURL: os.Getenv("AI_API_URL"),
 		apiKey: os.Getenv("AI_API_KEY"),
+		model:  model,
 		client: &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
+func (c *AIConnector) ModelName() string {
+	return c.model
+}
+
 func (c *AIConnector) Analyze(anonymizedText string) ([]byte, error) {
-	if c.apiURL == "" {
+	if c.apiURL == "" || c.apiKey == "" {
 		return c.mockAnalysis(anonymizedText)
 	}
 
@@ -45,19 +55,25 @@ func (c *AIConnector) Analyze(anonymizedText string) ([]byte, error) {
 Документ (персональные данные обезличены):
 %s
 
-Верни ответ в формате JSON со следующими полями:
-- risks: список рисков
-- fraud_indicators: признаки мошенничества
-- recommendations: рекомендации
-- summary: краткое резюме`, anonymizedText)
+Верни ответ СТРОГО в формате JSON (без markdown, только сам JSON объект) со следующими полями:
+{
+  "risks": ["список рисков"],
+  "fraud_indicators": ["признаки мошенничества"],
+  "recommendations": ["рекомендации"],
+  "summary": "краткое резюме"
+}`, anonymizedText)
 
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"model": "gpt-4",
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"model": c.model,
 		"messages": []map[string]string{
+			{"role": "system", "content": "Ты — эксперт по юридическому анализу документов. Всегда отвечай строго в формате JSON без markdown блоков."},
 			{"role": "user", "content": prompt},
 		},
-		"response_format": map[string]string{"type": "json_object"},
+		"stream": false,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal ai request: %w", err)
+	}
 
 	req, err := http.NewRequest(http.MethodPost, c.apiURL, bytes.NewReader(reqBody))
 	if err != nil {
@@ -89,14 +105,27 @@ func (c *AIConnector) Analyze(anonymizedText string) ([]byte, error) {
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode ai response: %w", err)
 	}
 
 	if len(apiResp.Choices) == 0 {
 		return nil, fmt.Errorf("empty response from ai")
 	}
 
-	return []byte(apiResp.Choices[0].Message.Content), nil
+	content := apiResp.Choices[0].Message.Content
+
+	// Проверяем, что контент — валидный JSON; если нет, оборачиваем в summary
+	if !json.Valid([]byte(content)) {
+		fallback := AIAnalysisResult{
+			Risks:           []string{},
+			FraudIndicators: []string{},
+			Recommendations: []string{},
+			Summary:         content,
+		}
+		return json.Marshal(fallback)
+	}
+
+	return []byte(content), nil
 }
 
 func (c *AIConnector) mockAnalysis(text string) ([]byte, error) {
@@ -104,7 +133,7 @@ func (c *AIConnector) mockAnalysis(text string) ([]byte, error) {
 		Risks:           []string{"Документ требует проверки юристом"},
 		FraudIndicators: []string{},
 		Recommendations: []string{"Рекомендуется детальная проверка условий договора"},
-		Summary:         fmt.Sprintf("Документ проанализирован (тестовый режим). Длина текста: %d символов.", len(text)),
+		Summary:         fmt.Sprintf("Документ проанализирован (тестовый режим, AI не подключён). Длина текста: %d символов.", len(text)),
 	}
 	return json.Marshal(result)
 }
