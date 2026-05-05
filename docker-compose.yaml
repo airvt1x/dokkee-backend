@@ -1,43 +1,71 @@
+version: '3.8'
+
 services:
-  dokkee-postgres:
-    image: postgres:18.1-bookworm
-    container_name: dokkee-env-postgres
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - ${PROJECT_ROOT}/out/pgdata:/var/lib/postgresql
-    restart: always
-
   dokkee-backend:
-    build:
-      context: .
-      args:
-        - PORT=${PORT:-8000}
-    container_name: dokkee-env-backend
-    environment:
-      - POSTGRES_HOST=dokkee-postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - salt=${salt}
-      - sign_key=${sign_key}
+    build: .
+    container_name: dokkee-backend
     ports:
-      - "${PORT:-8000}:${PORT:-8000}"
+      - "8000:8000"
+    env_file: .env
     depends_on:
-      - dokkee-postgres
+      dokkee-postgres:
+        condition: service_healthy
+      postgres-migrate:
+        condition: service_completed_successfully
+      dokkee-minio:
+        condition: service_healthy
     restart: always
 
-  dokkee-postgres-migrate:
+  dokkee-postgres:
+    image: postgres:18-alpine
+    container_name: dokkee-postgres
+    env_file: .env
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  postgres-migrate:
     image: migrate/migrate:v4.19.1
+    command: ["-path", "/migrations", "-database", "$DATABASE_URL", "up"]
     volumes:
-      - ${PROJECT_ROOT}/migrations:/migrations
-  
+      - ./migrations:/migrations
+    depends_on:
+      dokkee-postgres:
+        condition: service_healthy
+    env_file: .env
+
+  dokkee-minio:
+    image: minio/minio:latest
+    container_name: dokkee-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${S3_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${S3_SECRET_KEY}
+    expose:
+      - "9000"
+    ports:
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
   port-forwarder:
     image: alpine/socat:1.8.0.3
     container_name: dokkee-postgres-port-forwarder
     command: tcp-listen:5432,fork,reuseaddr tcp-connect:dokkee-postgres:5432
     ports:
-      - "127.0.0.1:${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    profiles: ["dev"]
+
+volumes:
+  minio_data:
