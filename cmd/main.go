@@ -2,8 +2,9 @@ package main
 
 import (
 	"os"
+	"strconv"
 
-	"github.com/airvt1x/dokkee-backend"
+	dokkee "github.com/airvt1x/dokkee-backend"
 	"github.com/airvt1x/dokkee-backend/internal/handler"
 	"github.com/airvt1x/dokkee-backend/internal/repository"
 	"github.com/airvt1x/dokkee-backend/internal/service"
@@ -35,7 +36,19 @@ func main() {
 		logrus.Fatalf("failed to connect to postgres: %s", err.Error())
 	}
 
-	repos := repository.NewRepository(db)
+	useSSL, _ := strconv.ParseBool(os.Getenv("S3_USE_SSL"))
+	s3, err := repository.NewS3Repository(repository.S3Config{
+		Endpoint:        os.Getenv("S3_ENDPOINT"),
+		AccessKeyID:     os.Getenv("S3_ACCESS_KEY"),
+		SecretAccessKey: os.Getenv("S3_SECRET_KEY"),
+		BucketName:      os.Getenv("S3_BUCKET"),
+		UseSSL:          useSSL,
+	})
+	if err != nil {
+		logrus.Fatalf("failed to connect to S3: %s", err.Error())
+	}
+
+	repos := repository.NewRepository(db, s3)
 	services := service.NewService(repos)
 	handlers := handler.NewHandler(services)
 

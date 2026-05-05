@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/airvt1x/dokkee-backend"
+	dokkee "github.com/airvt1x/dokkee-backend"
 	"github.com/airvt1x/dokkee-backend/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -23,14 +23,24 @@ func (m *MockAuthorizationService) CreateUser(user dokkee.User) (int, error) {
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockAuthorizationService) GenerateToken(email, password string) (string, error) {
-	args := m.Called(email, password)
+func (m *MockAuthorizationService) GenerateToken(username, password string) (string, error) {
+	args := m.Called(username, password)
 	return args.String(0), args.Error(1)
 }
 
 func (m *MockAuthorizationService) ParseToken(token string) (int, error) {
 	args := m.Called(token)
 	return args.Int(0), args.Error(1)
+}
+
+func (m *MockAuthorizationService) GetProfile(userID int) (dokkee.User, error) {
+	args := m.Called(userID)
+	return args.Get(0).(dokkee.User), args.Error(1)
+}
+
+func (m *MockAuthorizationService) UpdateProfile(userID int, input dokkee.UpdateProfileInput) error {
+	args := m.Called(userID, input)
+	return args.Error(0)
 }
 
 func TestHandler_signUp(t *testing.T) {
@@ -81,11 +91,11 @@ func TestHandler_signIn(t *testing.T) {
 	}
 
 	input := signInInput{
-		Email:    "test@example.com",
+		Username: "testuser",
 		Password: "password",
 	}
 
-	mockService.On("GenerateToken", input.Email, input.Password).Return("token123", nil)
+	mockService.On("GenerateToken", input.Username, input.Password).Return("token123", nil)
 
 	body, _ := json.Marshal(input)
 	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-in", bytes.NewBuffer(body))

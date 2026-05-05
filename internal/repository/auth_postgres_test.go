@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/airvt1x/dokkee-backend"
+	dokkee "github.com/airvt1x/dokkee-backend"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,9 +27,17 @@ func TestAuthPostgres_CreateUser(t *testing.T) {
 		Phone:      "+1234567890",
 	}
 
-	mock.ExpectQuery(`INSERT INTO users \(username, password_hash, first_name, last_name, middle_name, email, phone\) VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\) RETURNING id`).
-		WithArgs(user.Username, user.Password, user.FirstName, user.LastName, user.MiddleName, user.Email, user.Phone).
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO auth_credentials`).
+		WithArgs(user.Username, user.Password).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+	mock.ExpectExec(`INSERT INTO user_profiles`).
+		WithArgs(1, user.FirstName, user.LastName, user.MiddleName, user.Email, user.Phone).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`INSERT INTO user_balances`).
+		WithArgs(1).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
 	id, err := repo.CreateUser(user)
 
@@ -46,20 +54,15 @@ func TestAuthPostgres_GetUser(t *testing.T) {
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := NewAuthPostgres(sqlxDB)
 
-	email := "test@example.com"
-	password := "hashedpassword"
+	username := "testuser"
 
-	expectedUser := dokkee.User{
-		Id: 1,
-	}
+	mock.ExpectQuery(`SELECT id, password_hash AS password FROM auth_credentials WHERE username = \$1`).
+		WithArgs(username).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "password"}).AddRow(1, "hashedpassword"))
 
-	mock.ExpectQuery(`SELECT id FROM users WHERE email = \$1 AND password_hash = \$2`).
-		WithArgs(email, password).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-
-	user, err := repo.GetUser(email, password)
+	user, err := repo.GetUser(username)
 
 	assert.NoError(t, err)
-	assert.Equal(t, expectedUser.Id, user.Id)
+	assert.Equal(t, 1, user.Id)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
