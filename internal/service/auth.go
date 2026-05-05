@@ -1,21 +1,21 @@
 package service
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/airvt1x/dokkee-backend"
+	dokkee "github.com/airvt1x/dokkee-backend"
 	"github.com/airvt1x/dokkee-backend/internal/repository"
 	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/crypto/bcrypt"
 )
 
-var salt = os.Getenv("salt")
-var signKey = os.Getenv("sign_key")
-
-const tokenTTL = time.Hour * 24
+const (
+	tokenTTL = 12 * time.Hour
+	hashCost = 8
+)
 
 type tokenClaims struct {
 	jwt.StandardClaims
@@ -27,20 +27,26 @@ type AuthService struct {
 }
 
 func NewAuthService(repo repository.Authorization) *AuthService {
-	return &AuthService{
-		repo: repo,
-	}
+	return &AuthService{repo: repo}
 }
 
 func (s *AuthService) CreateUser(user dokkee.User) (int, error) {
-	user.Password = generatePasswordHash(user.Password)
+	hash, err := generatePasswordHash(user.Password)
+	if err != nil {
+		return 0, fmt.Errorf("failed to hash password: %w", err)
+	}
+	user.Password = hash
 	return s.repo.CreateUser(user)
 }
 
-func (s *AuthService) GenerateToken(email, password string) (string, error) {
-	user, err := s.repo.GetUser(email, generatePasswordHash(password))
+func (s *AuthService) GenerateToken(username, password string) (string, error) {
+	user, err := s.repo.GetUser(username)
 	if err != nil {
-		return "", err
+		return "", errors.New("invalid credentials")
+	}
+
+	if err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return "", errors.New("invalid credentials")
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &tokenClaims{
@@ -51,7 +57,7 @@ func (s *AuthService) GenerateToken(email, password string) (string, error) {
 		UserId: user.Id,
 	})
 
-	return token.SignedString([]byte(signKey))
+	return token.SignedString([]byte(os.Getenv("sign_key")))
 }
 
 func (s *AuthService) ParseToken(accessToken string) (int, error) {
@@ -59,12 +65,12 @@ func (s *AuthService) ParseToken(accessToken string) (int, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-
-		return []byte(signKey), nil
+		return []byte(os.Getenv("sign_key")), nil
 	})
 	if err != nil {
 		return 0, err
 	}
+
 	claims, ok := token.Claims.(*tokenClaims)
 	if !ok {
 		return 0, errors.New("invalid token claims")
@@ -73,9 +79,18 @@ func (s *AuthService) ParseToken(accessToken string) (int, error) {
 	return claims.UserId, nil
 }
 
-func generatePasswordHash(password string) string {
-	hash := sha256.New()
-	hash.Write([]byte(password))
+func (s *AuthService) GetProfile(userID int) (dokkee.User, error) {
+	return s.repo.GetProfile(userID)
+}
 
-	return fmt.Sprintf("%x", hash.Sum([]byte(salt)))
+func (s *AuthService) UpdateProfile(userID int, input dokkee.UpdateProfileInput) error {
+	return s.repo.UpdateProfile(userID, input)
+}
+
+func generatePasswordHash(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), hashCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }

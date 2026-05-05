@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/airvt1x/dokkee-backend"
+	dokkee "github.com/airvt1x/dokkee-backend"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,13 +21,11 @@ func (h *Handler) signUp(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id": id,
-	})
+	c.JSON(http.StatusOK, gin.H{"id": id})
 }
 
 type signInInput struct {
-	Email    string `json:"email" binding:"required"`
+	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -39,13 +37,11 @@ func (h *Handler) signIn(c *gin.Context) {
 		return
 	}
 
-	token, err := h.services.GenerateToken(input.Email, input.Password)
+	token, err := h.services.GenerateToken(input.Username, input.Password)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		newErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-	})
+	c.JSON(http.StatusOK, gin.H{"token": token})
 }

@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/airvt1x/dokkee-backend"
+	dokkee "github.com/airvt1x/dokkee-backend"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -17,14 +17,24 @@ func (m *MockAuthorization) CreateUser(user dokkee.User) (int, error) {
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockAuthorization) GetUser(email, password string) (dokkee.User, error) {
-	args := m.Called(email, password)
+func (m *MockAuthorization) GetUser(username string) (dokkee.User, error) {
+	args := m.Called(username)
 	return args.Get(0).(dokkee.User), args.Error(1)
+}
+
+func (m *MockAuthorization) GetProfile(userID int) (dokkee.User, error) {
+	args := m.Called(userID)
+	return args.Get(0).(dokkee.User), args.Error(1)
+}
+
+func (m *MockAuthorization) UpdateProfile(userID int, input dokkee.UpdateProfileInput) error {
+	args := m.Called(userID, input)
+	return args.Error(0)
 }
 
 func TestAuthService_CreateUser(t *testing.T) {
 	mockRepo := new(MockAuthorization)
-	service := NewAuthService(mockRepo)
+	svc := NewAuthService(mockRepo)
 
 	user := dokkee.User{
 		Username:  "testuser",
@@ -37,7 +47,7 @@ func TestAuthService_CreateUser(t *testing.T) {
 
 	mockRepo.On("CreateUser", mock.AnythingOfType("dokkee.User")).Return(1, nil)
 
-	id, err := service.CreateUser(user)
+	id, err := svc.CreateUser(user)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, id)
@@ -46,19 +56,22 @@ func TestAuthService_CreateUser(t *testing.T) {
 
 func TestAuthService_GenerateToken(t *testing.T) {
 	mockRepo := new(MockAuthorization)
-	service := NewAuthService(mockRepo)
+	svc := NewAuthService(mockRepo)
 
-	email := "test@example.com"
+	username := "testuser"
 	password := "password"
 
+	// bcrypt hash for "password"
+	hash, _ := generatePasswordHash(password)
 	user := dokkee.User{
-		Id:    1,
-		Email: email,
+		Id:       1,
+		Username: username,
+		Password: hash,
 	}
 
-	mockRepo.On("GetUser", email, mock.AnythingOfType("string")).Return(user, nil)
+	mockRepo.On("GetUser", username).Return(user, nil)
 
-	token, err := service.GenerateToken(email, password)
+	token, err := svc.GenerateToken(username, password)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
@@ -67,16 +80,19 @@ func TestAuthService_GenerateToken(t *testing.T) {
 
 func TestAuthService_ParseToken(t *testing.T) {
 	mockRepo := new(MockAuthorization)
-	service := NewAuthService(mockRepo)
+	svc := NewAuthService(mockRepo)
 
-	user := dokkee.User{Id: 1}
-	mockRepo.On("GetUser", "test@example.com", mock.AnythingOfType("string")).Return(user, nil)
+	username := "testuser"
+	password := "password"
+	hash, _ := generatePasswordHash(password)
+	user := dokkee.User{Id: 1, Username: username, Password: hash}
 
-	token, err := service.GenerateToken("test@example.com", "password")
+	mockRepo.On("GetUser", username).Return(user, nil)
+
+	token, err := svc.GenerateToken(username, password)
 	assert.NoError(t, err)
 
-	userId, err := service.ParseToken(token)
-
+	userID, err := svc.ParseToken(token)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, userId)
+	assert.Equal(t, 1, userID)
 }
