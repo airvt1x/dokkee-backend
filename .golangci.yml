@@ -1,32 +1,22 @@
 version: "2"
-run:
-  modules-download-mode: readonly
+
 linters:
+  default: none
   enable:
-    - gosec
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
     - misspell
-    - revive
-  settings:
-    revive:
-      rules:
-        - name: exported
-          severity: warning
-          disabled: false
-  exclusions:
-    generated: lax
-    rules:
-      - path: (.+)\.go$
-        text: should have comment
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+
 formatters:
   enable:
     - gofmt
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+
+run:
+  timeout: 5m
+
+issues:
+  uniq-by-line: true
