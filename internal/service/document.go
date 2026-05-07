@@ -18,7 +18,7 @@ const (
 )
 
 var allowedMimeTypes = map[string]bool{
-	"application/pdf":                                                          true,
+	"application/pdf": true,
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 	"text/plain": true,
 }
