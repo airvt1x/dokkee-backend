@@ -11,6 +11,7 @@ linters:
     - ineffassign
     - misspell
 
+
 formatters:
   enable:
     - gofmt
