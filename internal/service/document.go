@@ -134,7 +134,7 @@ func (s *DocumentService) runAnalysisPipeline(docID int, s3Key string) {
 	s.resultRepo.Save(dokkee.AnalysisResult{
 		DocumentID: docID,
 		ResultJSON: result,
-		ModelUsed:  "gpt-4",
+		ModelUsed:  s.aiConn.ModelName(),
 	})
 	s.repo.UpdateStatus(docID, "completed", "")
 }

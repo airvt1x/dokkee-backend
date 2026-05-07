@@ -1,6 +1,9 @@
 package dokkee
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Document struct {
 	Id           int       `json:"id" db:"id"`
@@ -18,7 +21,7 @@ type Document struct {
 type AnalysisResult struct {
 	Id         int       `json:"id" db:"id"`
 	DocumentID int       `json:"document_id" db:"document_id"`
-	ResultJSON []byte    `json:"result" db:"result_json"`
+	ResultJSON json.RawMessage `json:"result" db:"result_json"`
 	ModelUsed  string    `json:"model_used" db:"model_used"`
 	TokensUsed int       `json:"tokens_used" db:"tokens_used"`
 	AnalyzedAt time.Time `json:"analyzed_at" db:"analyzed_at"`

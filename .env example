@@ -12,5 +12,5 @@ S3_SECRET_KEY=minioadmin
 S3_BUCKET=dokkee-documents
 S3_USE_SSL=false
 
-AI_API_URL=
-AI_API_KEY=
+AI_API_URL=test-url
+AI_API_KEY=test-key
