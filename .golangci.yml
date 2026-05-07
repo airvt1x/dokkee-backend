@@ -5,9 +5,8 @@ linters:
   enable:
     - govet
     - errcheck
-    - staticcheck
+    - staticcheck   # <-- gosimple и stylecheck теперь находятся внутри него
     - unused
-    - simple
     - ineffassign
     - misspell
 
