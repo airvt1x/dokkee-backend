@@ -11,13 +11,13 @@ linters:
     - ineffassign
     - misspell
 
-
 formatters:
   enable:
     - gofmt
 
 run:
   timeout: 5m
+  go: '1.24'
 
 issues:
   uniq-by-line: true
