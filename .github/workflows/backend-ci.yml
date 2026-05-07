@@ -1,0 +1,191 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'Makefile'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint Go code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64
+          args: --timeout=5m
+          working-directory: .
+
+  fmt:
+    name: Check go fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Run go fmt
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Files not formatted:"
+            gofmt -l .
+            exit 1
+          fi
+          echo "All files formatted correctly"
+
+  mod-verify:
+    name: Verify go modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - run: go mod verify
+      - run: go mod download
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: [mod-verify]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Run unit tests with coverage
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+  docker-build:
+    name: Docker build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: builder
+          load: true
+          tags: dokkee-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify binary was built
+        run: |
+          docker run --rm dokkee-backend:ci ls -la /app/main || exit 1
+          echo "Docker image built successfully"
+
+  integration-tests:
+    name: Integration tests with Postgres
+    runs-on: ubuntu-latest
+    needs: [unit-tests, docker-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Start PostgreSQL
+        run: |
+          docker compose up -d dokkee-postgres
+          sleep 5
+      - name: Wait for PostgreSQL
+        run: |
+          until docker exec dokkee-postgres pg_isready -U dokkee; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+      - name: Run migrations
+        run: |
+          docker compose run --rm postgres-migrate
+      - name: Run integration tests
+        run: |
+          go test -v -tags=integration ./...
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: dokkee
+          POSTGRES_PASSWORD: dokkee_secret
+          POSTGRES_DB: dokkee
+          sign_key: test-jwt-secret-key-for-ci-only
+          S3_ENDPOINT: http://localhost:9000
+          S3_ACCESS_KEY: minioadmin
+          S3_SECRET_KEY: minioadmin
+          S3_BUCKET: dokkee-documents
+          S3_USE_SSL: false
+          AI_API_URL: https://api.mock.ai
+          AI_API_KEY: mock-key
+          AI_MODEL: mock-model
+      - name: Stop services
+        if: always()
+        run: docker compose down
+
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, fmt, mod-verify, unit-tests, docker-build, integration-tests]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          jobs="lint fmt mod-verify unit-tests docker-build integration-tests"
+          failed=false
+          for job in $jobs; do
+            result=$(echo '${{ toJson(needs) }}' | jq -r ".[\"$job\"].result")
+            if [ "$result" = "success" ]; then
+              echo "[OK] Job $job succeeded"
+            elif [ "$result" = "skipped" ]; then
+              echo "[SKIP] Job $job skipped"
+            else
+              echo "[FAIL] Job $job failed or cancelled"
+              failed=true
+            fi
+          done
+          if [ "$failed" = "true" ]; then
+            exit 1
+          fi
+          echo "All backend CI jobs completed successfully"
