@@ -7,7 +7,7 @@ linters:
     - errcheck
     - staticcheck
     - unused
-    - gosimple
+    - simple
     - ineffassign
     - misspell
 
