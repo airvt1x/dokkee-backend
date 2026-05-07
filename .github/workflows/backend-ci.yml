@@ -40,7 +40,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.64
+          version: v2.1.6
           args: --timeout=5m
           working-directory: .
 
@@ -129,6 +129,23 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+      - name: Create .env file from template
+        run: |
+          cat > .env << 'EOF'
+          POSTGRES_USER=dokkee
+          POSTGRES_PASSWORD=dokkee_secret
+          POSTGRES_DB=dokkee
+          DATABASE_URL=postgres://dokkee:dokkee_secret@localhost:5432/dokkee?sslmode=disable
+          sign_key=test-jwt-secret-key-for-ci-only
+          S3_ENDPOINT=localhost:9000
+          S3_ACCESS_KEY=minioadmin
+          S3_SECRET_KEY=minioadmin
+          S3_BUCKET=dokkee-documents
+          S3_USE_SSL=false
+          AI_API_URL=https://api.mock.ai
+          AI_API_KEY=mock-key
+          AI_MODEL=mock-model
+          EOF
       - name: Start PostgreSQL
         run: |
           docker compose up -d dokkee-postgres
@@ -142,6 +159,8 @@ jobs:
       - name: Run migrations
         run: |
           docker compose run --rm postgres-migrate
+        env:
+          DATABASE_URL: postgres://dokkee:dokkee_secret@dokkee-postgres:5432/dokkee?sslmode=disable
       - name: Run integration tests
         run: |
           go test -v -tags=integration ./...
@@ -152,7 +171,7 @@ jobs:
           POSTGRES_PASSWORD: dokkee_secret
           POSTGRES_DB: dokkee
           sign_key: test-jwt-secret-key-for-ci-only
-          S3_ENDPOINT: http://localhost:9000
+          S3_ENDPOINT: localhost:9000
           S3_ACCESS_KEY: minioadmin
           S3_SECRET_KEY: minioadmin
           S3_BUCKET: dokkee-documents
