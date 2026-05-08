@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   dokkee-backend:
@@ -57,7 +57,8 @@ services:
     depends_on:
       dokkee-postgres:
         condition: service_healthy
-    env_file: .env
+    environment:
+      DATABASE_URL: postgres://dokkee:dokkee_secret@dokkee-postgres:5432/dokkee?sslmode=disable
 
   dokkee-minio:
     image: minio/minio:latest
