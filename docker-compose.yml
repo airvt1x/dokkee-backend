@@ -24,7 +24,7 @@ services:
       - AI_API_KEY=${AI_API_KEY}
       - AI_MODEL=${AI_MODEL}
     ports:
-      - "${PORT:-8000}:${PORT:-8000}"
+      - "${PORT:-8001}:${PORT:-8000}"
     depends_on:
       dokkee-postgres:
         condition: service_healthy
@@ -70,7 +70,7 @@ services:
     expose:
       - "9000"
     ports:
-      - "9001:9001"
+      - "9002:9001"
     volumes:
       - minio_data:/data
     healthcheck:

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"testing"
 
 	dokkee "github.com/airvt1x/dokkee-backend"
@@ -32,6 +33,8 @@ func (m *MockAuthorization) UpdateProfile(userID int, input dokkee.UpdateProfile
 	return args.Error(0)
 }
 
+// --- Existing tests ---
+
 func TestAuthService_CreateUser(t *testing.T) {
 	mockRepo := new(MockAuthorization)
 	svc := NewAuthService(mockRepo)
@@ -61,7 +64,6 @@ func TestAuthService_GenerateToken(t *testing.T) {
 	username := "testuser"
 	password := "password"
 
-	// bcrypt hash for "password"
 	hash, _ := generatePasswordHash(password)
 	user := dokkee.User{
 		Id:       1,
@@ -95,4 +97,70 @@ func TestAuthService_ParseToken(t *testing.T) {
 	userID, err := svc.ParseToken(token)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, userID)
+}
+
+// --- New tests ---
+
+func TestAuthService_GetProfile(t *testing.T) {
+	mockRepo := new(MockAuthorization)
+	svc := NewAuthService(mockRepo)
+
+	userID := 1
+	expectedUser := dokkee.User{
+		Id:        userID,
+		Username:  "testuser",
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "test@example.com",
+		Balance:   10.5,
+	}
+
+	mockRepo.On("GetProfile", userID).Return(expectedUser, nil)
+
+	user, err := svc.GetProfile(userID)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedUser, user)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_GetProfile_Error(t *testing.T) {
+	mockRepo := new(MockAuthorization)
+	svc := NewAuthService(mockRepo)
+
+	userID := 999
+	mockRepo.On("GetProfile", userID).Return(dokkee.User{}, errors.New("user not found"))
+
+	_, err := svc.GetProfile(userID)
+	assert.Error(t, err)
+	assert.Equal(t, "user not found", err.Error())
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_UpdateProfile(t *testing.T) {
+	mockRepo := new(MockAuthorization)
+	svc := NewAuthService(mockRepo)
+
+	userID := 1
+	firstName := "Updated"
+	input := dokkee.UpdateProfileInput{FirstName: &firstName}
+
+	mockRepo.On("UpdateProfile", userID, input).Return(nil)
+
+	err := svc.UpdateProfile(userID, input)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_UpdateProfile_Error(t *testing.T) {
+	mockRepo := new(MockAuthorization)
+	svc := NewAuthService(mockRepo)
+
+	userID := 1
+	input := dokkee.UpdateProfileInput{}
+	mockRepo.On("UpdateProfile", userID, input).Return(errors.New("db error"))
+
+	err := svc.UpdateProfile(userID, input)
+	assert.Error(t, err)
+	assert.Equal(t, "db error", err.Error())
+	mockRepo.AssertExpectations(t)
 }

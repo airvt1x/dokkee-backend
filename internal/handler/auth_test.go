@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,6 +43,8 @@ func (m *MockAuthorizationService) UpdateProfile(userID int, input dokkee.Update
 	args := m.Called(userID, input)
 	return args.Error(0)
 }
+
+// ========== СУЩЕСТВУЮЩИЕ ТЕСТЫ ==========
 
 func TestHandler_signUp(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -111,4 +114,68 @@ func TestHandler_signIn(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Equal(t, "token123", response["token"])
 	mockService.AssertExpectations(t)
+}
+
+// ========== НОВЫЕ ТЕСТЫ ==========
+
+func TestHandler_signUp_InvalidJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-up", bytes.NewBufferString("invalid"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-up", handler.signUp)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandler_signUp_ServiceError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockAuthorizationService)
+	handler := &Handler{
+		services: &service.Service{
+			Authorization: mockService,
+		},
+	}
+
+	user := dokkee.User{
+		Username:  "testuser",
+		Password:  "password",
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "test@example.com",
+		Phone:     "+1234567890",
+	}
+	mockService.On("CreateUser", mock.Anything).Return(0, errors.New("duplicate username"))
+
+	body, _ := json.Marshal(user)
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-up", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-up", handler.signUp)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_signIn_InvalidJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-in", bytes.NewBufferString("invalid"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-in", handler.signIn)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }

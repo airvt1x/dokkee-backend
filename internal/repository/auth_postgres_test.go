@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -9,7 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthPostgres_CreateUser(t *testing.T) {
+
+func TestAuthPostgres_UpdateProfile(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
@@ -17,36 +19,30 @@ func TestAuthPostgres_CreateUser(t *testing.T) {
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := NewAuthPostgres(sqlxDB)
 
-	user := dokkee.User{
-		Username:   "testuser",
-		Password:   "hashedpassword",
-		FirstName:  "Test",
-		LastName:   "User",
-		MiddleName: "Middle",
-		Email:      "test@example.com",
-		Phone:      "+1234567890",
+	userID := 1
+	firstName := "Updated"
+	lastName := "User"
+	middleName := "M"
+	phone := "+79991234567"
+
+	input := dokkee.UpdateProfileInput{
+		FirstName:  &firstName,
+		LastName:   &lastName,
+		MiddleName: &middleName,
+		Phone:      &phone,
 	}
 
-	mock.ExpectBegin()
-	mock.ExpectQuery(`INSERT INTO auth_credentials`).
-		WithArgs(user.Username, user.Password).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-	mock.ExpectExec(`INSERT INTO user_profiles`).
-		WithArgs(1, user.FirstName, user.LastName, user.MiddleName, user.Email, user.Phone).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(`INSERT INTO user_balances`).
-		WithArgs(1).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
+	expectedQuery := regexp.QuoteMeta(`UPDATE user_profiles SET first_name = $1, last_name = $2, middle_name = $3, phone = $4, updated_at = NOW() WHERE user_id = $5`)
+	mock.ExpectExec(expectedQuery).
+		WithArgs(firstName, lastName, middleName, phone, userID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	id, err := repo.CreateUser(user)
-
+	err = repo.UpdateProfile(userID, input)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, id)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestAuthPostgres_GetUser(t *testing.T) {
+func TestAuthPostgres_UpdateProfile_NoFields(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
@@ -54,15 +50,9 @@ func TestAuthPostgres_GetUser(t *testing.T) {
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := NewAuthPostgres(sqlxDB)
 
-	username := "testuser"
+	input := dokkee.UpdateProfileInput{}
 
-	mock.ExpectQuery(`SELECT id, password_hash AS password FROM auth_credentials WHERE username = \$1`).
-		WithArgs(username).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "password"}).AddRow(1, "hashedpassword"))
-
-	user, err := repo.GetUser(username)
-
+	err = repo.UpdateProfile(1, input)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, user.Id)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
