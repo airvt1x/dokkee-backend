@@ -164,3 +164,32 @@ func TestAuthService_UpdateProfile_Error(t *testing.T) {
 	assert.Equal(t, "db error", err.Error())
 	mockRepo.AssertExpectations(t)
 }
+
+func TestAuthService_GenerateToken_InvalidPassword(t *testing.T) {
+	mockRepo := new(MockAuthorization)
+	svc := NewAuthService(mockRepo)
+
+	username := "testuser"
+	password := "wrongpassword"
+
+	hash, _ := generatePasswordHash("correctpassword")
+	user := dokkee.User{
+		Id:       1,
+		Username: username,
+		Password: hash,
+	}
+
+	mockRepo.On("GetUser", username).Return(user, nil)
+
+	_, err := svc.GenerateToken(username, password)
+	assert.Error(t, err)
+	assert.Equal(t, "invalid credentials", err.Error())
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ParseToken_Invalid(t *testing.T) {
+	svc := NewAuthService(nil)
+
+	_, err := svc.ParseToken("invalid.token.string")
+	assert.Error(t, err)
+}

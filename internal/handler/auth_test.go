@@ -179,3 +179,67 @@ func TestHandler_signIn_InvalidJSON(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+func TestHandler_signUp_EmptyBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-up", bytes.NewBufferString(""))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-up", handler.signUp)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandler_signIn_EmptyBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-in", bytes.NewBufferString(""))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-in", handler.signIn)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandler_signIn_MissingUsername(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	input := map[string]string{"password": "pass123"}
+	body, _ := json.Marshal(input)
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-in", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-in", handler.signIn)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandler_signUp_EmptyUsername(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	user := map[string]string{"username": "", "password": "pass"}
+	body, _ := json.Marshal(user)
+	req, _ := http.NewRequest(http.MethodPost, "/auth/sign-up", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.POST("/auth/sign-up", handler.signUp)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}

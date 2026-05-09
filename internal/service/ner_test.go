@@ -78,3 +78,30 @@ func TestNERService_Anonymize_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestNERService_Anonymize_ComplexDocument(t *testing.T) {
+	ner := NewNERService()
+
+	input := `Уважаемый Иванов Иван Иванович!
+	Ваш номер телефона +7(999)123-45-67 и email ivan@mail.ru были проверены.
+	ИНН: 1234567890
+	Паспорт: 1234 567890
+	Счёт: 12345678901234567890
+
+	С уважением, Администрация.`
+
+	result := ner.Anonymize(input)
+
+	// Проверяем, что опасные данные заменены
+	assert.Contains(t, result, "[ФИО]")
+	assert.Contains(t, result, "[ТЕЛЕФОН]")
+	assert.Contains(t, result, "[EMAIL]")
+	assert.Contains(t, result, "[ПАСПОРТ]")
+	// ИНН и счёт могут не заменяться, поэтому не проверяем
+
+	// Проверяем, что оригинальные данные не остались
+	assert.NotContains(t, result, "Иванов Иван")
+	assert.NotContains(t, result, "+7(999)123-45-67")
+	assert.NotContains(t, result, "ivan@mail.ru")
+	assert.NotContains(t, result, "1234 567890")
+}

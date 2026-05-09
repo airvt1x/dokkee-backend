@@ -303,3 +303,73 @@ func TestHandler_getDocument_WrongUser(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	mockDoc.AssertExpectations(t)
 }
+
+func TestHandler_uploadDocument_EmptyFile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockDoc := new(MockDocumentService)
+	handler := &Handler{
+		services: &service.Service{
+			Document: mockDoc,
+		},
+	}
+
+	body, contentType := createMultipartFile(t, "", "empty.pdf")
+	mockDoc.On("Upload", 1, mock.Anything, mock.Anything).Return(0, errors.New("empty file"))
+
+	req, _ := http.NewRequest(http.MethodPost, "/api/documents", body)
+	req.Header.Set("Content-Type", contentType)
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", 1)
+	})
+	router.POST("/api/documents", handler.uploadDocument)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	mockDoc.AssertExpectations(t)
+}
+
+func TestHandler_listDocuments_EmptyResult(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockDoc := new(MockDocumentService)
+	handler := &Handler{
+		services: &service.Service{
+			Document: mockDoc,
+		},
+	}
+
+	mockDoc.On("List", 1, "").Return([]dokkee.Document{}, nil)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/documents", nil)
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", 1)
+	})
+	router.GET("/api/documents", handler.listDocuments)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.Len(t, resp["documents"], 0)
+	mockDoc.AssertExpectations(t)
+}
+
+func TestHandler_getDocument_NoUserID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/documents/5", nil)
+	w := httptest.NewRecorder()
+	router := gin.New()
+	// Не устанавливаем user_id
+	router.GET("/api/documents/:id", handler.getDocument)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}

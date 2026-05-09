@@ -166,3 +166,51 @@ func TestDocumentService_List_Error(t *testing.T) {
 	assert.Equal(t, "db error", err.Error())
 	mockDocRepo.AssertExpectations(t)
 }
+
+func TestDocumentService_GetByID_EmptyResult(t *testing.T) {
+	mockDocRepo := new(MockDocumentRepository)
+	svc := &DocumentService{repo: mockDocRepo}
+
+	mockDocRepo.On("GetByID", 999, 1).Return(dokkee.Document{}, nil)
+
+	doc, err := svc.GetByID(999, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, doc.Id)
+	mockDocRepo.AssertExpectations(t)
+}
+
+func TestDocumentService_List_EmptyUserID(t *testing.T) {
+	mockDocRepo := new(MockDocumentRepository)
+	svc := &DocumentService{repo: mockDocRepo}
+
+	mockDocRepo.On("List", 0, "").Return([]dokkee.Document{}, nil)
+
+	docs, err := svc.List(0, "")
+	assert.NoError(t, err)
+	assert.Len(t, docs, 0)
+	mockDocRepo.AssertExpectations(t)
+}
+
+
+func TestDocumentService_CheckBalance_Error(t *testing.T) {
+	mockDocRepo := new(MockDocumentRepository)
+	svc := &DocumentService{repo: mockDocRepo}
+
+	mockDocRepo.On("CheckBalance", 1).Return(0.0, errors.New("db connection error"))
+
+	err := svc.checkBalance(1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to check balance")
+	mockDocRepo.AssertExpectations(t)
+}
+
+func TestDocumentService_CheckBalance_Success(t *testing.T) {
+	mockDocRepo := new(MockDocumentRepository)
+	svc := &DocumentService{repo: mockDocRepo}
+
+	mockDocRepo.On("CheckBalance", 1).Return(5.0, nil)
+
+	err := svc.checkBalance(1)
+	assert.NoError(t, err)
+	mockDocRepo.AssertExpectations(t)
+}

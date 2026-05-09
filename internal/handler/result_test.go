@@ -180,3 +180,37 @@ func TestHandler_getResult_InvalidID(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+func TestHandler_getResult_EmptyUserID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/documents/10/result", nil)
+	w := httptest.NewRecorder()
+	router := gin.New()
+	// Не устанавливаем user_id
+	router.GET("/api/documents/:id/result", handler.getResult)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Contains(t, w.Body.String(), "user not found")
+}
+
+func TestHandler_getResult_EmptyDocID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{services: &service.Service{}}
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/documents//result", nil)
+	w := httptest.NewRecorder()
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", 1)
+	})
+	router.GET("/api/documents/:id/result", handler.getResult)
+	router.ServeHTTP(w, req)
+
+	// Пустой ID приводит к 400 Bad Request (invalid document id)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}

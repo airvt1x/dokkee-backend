@@ -150,3 +150,25 @@ func TestAuditMiddleware_CallsLog(t *testing.T) {
 
 	mockAudit.AssertExpectations(t)
 }
+
+func TestAuditEventByPath(t *testing.T) {
+	tests := []struct {
+		path   string
+		method string
+		want   string
+	}{
+		{"/api/documents", "POST", "DOCUMENT_UPLOADED"},
+		{"/api/documents/1/result", "GET", "RESULT_ACCESSED"},
+		{"/api/profile", "GET", "PROFILE_ACCESSED"},
+		{"/api/profile", "PATCH", "PROFILE_UPDATED"},
+		{"/api/unknown", "GET", "API_REQUEST"},
+		{"/", "GET", "API_REQUEST"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path+"_"+tt.method, func(t *testing.T) {
+			got := auditEventByPath(tt.path, tt.method)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

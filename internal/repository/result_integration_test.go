@@ -58,3 +58,36 @@ func TestResultPostgres_SaveAndGet_Integration(t *testing.T) {
 	assert.Equal(t, docID, saved.DocumentID)
 	assert.JSONEq(t, string(resultJSON), string(saved.ResultJSON))
 }
+
+func TestResultPostgres_GetByDocumentID_NoResult_Integration(t *testing.T) {
+	authRepo := &AuthPostgres{db: testDB}
+	user := dokkee.User{
+		Username:  "no_result_user",
+		Password:  "hash",
+		FirstName: "No",
+		LastName:  "Result",
+		Email:     "noresult@test.com",
+		Phone:     "+79991112299",
+	}
+	userID, err := authRepo.CreateUser(user)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM auth_credentials WHERE id = $1", userID) })
+
+	docRepo := &DocumentPostgres{db: testDB}
+	doc := dokkee.Document{
+		UserID:       userID,
+		OriginalName: "noresult.pdf",
+		S3Key:        "noresult",
+		MimeType:     "pdf",
+		FileSize:     100,
+		Status:       "completed",
+	}
+	docID, err := docRepo.Create(doc)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM documents WHERE id = $1", docID) })
+
+	resultRepo := &ResultPostgres{db: testDB}
+	_, err = resultRepo.GetByDocumentID(docID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "sql: no rows")
+}

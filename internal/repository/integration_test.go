@@ -15,7 +15,7 @@ var testDB *sqlx.DB
 func TestMain(m *testing.M) {
 	host := os.Getenv("POSTGRES_HOST")
 	if host == "" {
-		host = "postgres"
+		host = "localhost"
 	}
 	port := os.Getenv("POSTGRES_PORT")
 	if port == "" {

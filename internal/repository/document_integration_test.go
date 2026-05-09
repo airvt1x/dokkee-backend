@@ -210,3 +210,128 @@ func TestDocumentPostgres_BalanceOperations_Integration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 9.0, newBalance)
 }
+
+func TestDocumentPostgres_GetByID_WrongUser_Integration(t *testing.T) {
+	authRepo := &AuthPostgres{db: testDB}
+	user1 := dokkee.User{
+		Username:  "user1_doc",
+		Password:  "hash",
+		FirstName: "User",
+		LastName:  "One",
+		Email:     "user1@test.com",
+		Phone:     "+79991112290",
+	}
+	user1ID, err := authRepo.CreateUser(user1)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM auth_credentials WHERE id = $1", user1ID) })
+
+	user2 := dokkee.User{
+		Username:  "user2_doc",
+		Password:  "hash",
+	FirstName: "User",
+		LastName:  "Two",
+		Email:     "user2@test.com",
+		Phone:     "+79991112291",
+	}
+	user2ID, err := authRepo.CreateUser(user2)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM auth_credentials WHERE id = $1", user2ID) })
+
+	docRepo := &DocumentPostgres{db: testDB}
+	doc := dokkee.Document{
+		UserID:       user1ID,
+		OriginalName: "private.pdf",
+		S3Key:        "private",
+		MimeType:     "pdf",
+		FileSize:     100,
+		Status:       "queued",
+	}
+	docID, err := docRepo.Create(doc)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM documents WHERE id = $1", docID) })
+
+	// user2 пытается получить документ user1
+	_, err = docRepo.GetByID(docID, user2ID)
+	assert.Error(t, err)
+}
+
+func TestDocumentPostgres_UpdateStatus_Error_Integration(t *testing.T) {
+	docRepo := &DocumentPostgres{db: testDB}
+
+	// Обновляем несуществующий документ — ошибки нет, просто 0 строк затронуто
+	err := docRepo.UpdateStatus(99999, "completed", "")
+	// В PostgreSQL UPDATE не возвращает ошибку, даже если ничего не обновлено
+	assert.NoError(t, err)
+}
+
+func TestDocumentPostgres_DecrementBalance_Insufficient_Integration(t *testing.T) {
+	authRepo := &AuthPostgres{db: testDB}
+	user := dokkee.User{
+		Username:  "poor_user",
+		Password:  "hash",
+		FirstName: "Poor",
+		LastName:  "User",
+		Email:     "poor@test.com",
+		Phone:     "+79991112292",
+	}
+	userID, err := authRepo.CreateUser(user)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM auth_credentials WHERE id = $1", userID) })
+
+	// Убеждаемся, что баланс 0
+	docRepo := &DocumentPostgres{db: testDB}
+	balance, err := docRepo.CheckBalance(userID)
+	require.NoError(t, err)
+	assert.Equal(t, 0.0, balance)
+
+	// Пытаемся списать при нулевом балансе
+	err = docRepo.DecrementBalance(userID)
+	// DecrementBalance возвращает nil, даже если баланс < 1 (sql.Result.RowsAffected() не проверяется)
+	// Поэтому ошибки нет
+	assert.NoError(t, err)
+
+	// Проверяем, что баланс остался 0
+	balanceAfter, err := docRepo.CheckBalance(userID)
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, balanceAfter)
+}
+
+func TestDocumentPostgres_Create_DuplicateS3Key_Integration(t *testing.T) {
+	authRepo := &AuthPostgres{db: testDB}
+	user := dokkee.User{
+		Username:  "dup_key_user",
+		Password:  "hash",
+		FirstName: "Dup",
+		LastName:  "Key",
+		Email:     "dupkey@test.com",
+		Phone:     "+79991112300",
+	}
+	userID, err := authRepo.CreateUser(user)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM auth_credentials WHERE id = $1", userID) })
+
+	docRepo := &DocumentPostgres{db: testDB}
+	doc := dokkee.Document{
+		UserID:       userID,
+		OriginalName: "dup.pdf",
+		S3Key:        "same_key",
+		MimeType:     "pdf",
+		FileSize:     100,
+		Status:       "queued",
+	}
+	id1, err := docRepo.Create(doc)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Exec("DELETE FROM documents WHERE id = $1", id1) })
+
+	doc2 := dokkee.Document{
+		UserID:       userID,
+		OriginalName: "dup2.pdf",
+		S3Key:        "same_key",
+		MimeType:     "pdf",
+		FileSize:     200,
+		Status:       "queued",
+	}
+	_, err = docRepo.Create(doc2)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate key value")
+}
