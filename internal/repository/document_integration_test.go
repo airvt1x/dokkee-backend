@@ -228,7 +228,7 @@ func TestDocumentPostgres_GetByID_WrongUser_Integration(t *testing.T) {
 	user2 := dokkee.User{
 		Username:  "user2_doc",
 		Password:  "hash",
-	FirstName: "User",
+		FirstName: "User",
 		LastName:  "Two",
 		Email:     "user2@test.com",
 		Phone:     "+79991112291",

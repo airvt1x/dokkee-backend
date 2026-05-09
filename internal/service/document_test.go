@@ -191,7 +191,6 @@ func TestDocumentService_List_EmptyUserID(t *testing.T) {
 	mockDocRepo.AssertExpectations(t)
 }
 
-
 func TestDocumentService_CheckBalance_Error(t *testing.T) {
 	mockDocRepo := new(MockDocumentRepository)
 	svc := &DocumentService{repo: mockDocRepo}

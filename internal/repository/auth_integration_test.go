@@ -152,13 +152,13 @@ func TestAuthPostgres_UpdateProfile_MultipleFields_Integration(t *testing.T) {
 func TestAuthPostgres_UpdateProfile_AllFields_Integration(t *testing.T) {
 	repo := &AuthPostgres{db: testDB}
 	user := dokkee.User{
-		Username:  "all_fields_user",
-		Password:  "hash",
-		FirstName: "OldFirst",
-		LastName:  "OldLast",
+		Username:   "all_fields_user",
+		Password:   "hash",
+		FirstName:  "OldFirst",
+		LastName:   "OldLast",
 		MiddleName: "OldMiddle",
-		Email:     "all@test.com",
-		Phone:     "+79991112301",
+		Email:      "all@test.com",
+		Phone:      "+79991112301",
 	}
 	id, err := repo.CreateUser(user)
 	require.NoError(t, err)

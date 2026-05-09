@@ -6,7 +6,7 @@ import (
 	"errors"
 	"regexp"
 	"testing"
-	"time"  
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	dokkee "github.com/airvt1x/dokkee-backend"
