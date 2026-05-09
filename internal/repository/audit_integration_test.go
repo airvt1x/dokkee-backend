@@ -13,12 +13,12 @@ func TestAuditPostgres_Insert_Integration(t *testing.T) {
 	repo := &AuditPostgres{db: testDB}
 
 	record := dokkee.AuditRecord{
-		EventType:   "API_REQUEST",
-		UserIDHash:  "hash123",
-		DocIDHash:   nil,
-		IPHash:      "iphash",
-		Success:     true,
-		ErrorCode:   "",
+		EventType:  "API_REQUEST",
+		UserIDHash: "hash123",
+		DocIDHash:  nil,
+		IPHash:     "iphash",
+		Success:    true,
+		ErrorCode:  "",
 	}
 	err := repo.Insert(record)
 	assert.NoError(t, err)

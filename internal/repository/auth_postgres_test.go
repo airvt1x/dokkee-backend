@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-
 func TestAuthPostgres_UpdateProfile(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
