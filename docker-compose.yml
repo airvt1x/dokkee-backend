@@ -69,7 +69,7 @@ services:
       - MINIO_ROOT_USER=${S3_ACCESS_KEY}
       - MINIO_ROOT_PASSWORD=${S3_SECRET_KEY}
     ports:
-      - "9005:9000"
+      - "9000:9000"
       - "9006:9001"
     volumes:
       - minio_data:/data
