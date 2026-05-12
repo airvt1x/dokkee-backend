@@ -159,10 +159,10 @@ jobs:
         env:
           DATABASE_URL: postgres://dokkee:dokkee_secret@dokkee-postgres:5432/dokkee?sslmode=disable
 
-      - name: Start port-forwarder for localhost access
-        run: |
-          docker compose up -d port-forwarder
-          sleep 3
+      #- name: Start port-forwarder for localhost access
+      #  run: |
+      #    docker compose up -d port-forwarder
+      #    sleep 3
 
       - name: Run integration tests
         run: |
